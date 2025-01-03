@@ -35,8 +35,6 @@ $ docker container ls
 CONTAINER ID   IMAGE                  COMMAND   CREATED          STATUS          PORTS     NAMES
 e84736012f9a   zkp-course-zkpserver   "bash"    20 minutes ago   Up 20 minutes             zkp-course_zkpserver_run_b1f3fa2cd94a
 
-![image](https://github.com/user-attachments/assets/6b54b44a-14c2-4335-8304-a17836f84280)
-
 $ docker exec -it e84736012f9a /bin/bash
 ```
 
@@ -45,3 +43,4 @@ Run the client:
 ```
 root@e84736012f9a:/zkp-server# cargo run --bin client --release
 ```
+![image](https://github.com/user-attachments/assets/77cbe475-68c6-4d04-89bd-a7de1ed27c13)
