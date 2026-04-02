@@ -1,6 +1,6 @@
 use std::io::stdin; 
-use num_bigint::BigUint; // Import BigUint for handling large integers.
-use tonic::Request; // Import Tonic's Request for making gRPC calls.
+use num_bigint::BigUint; use tracing::info;
+// Import BigUint for handling large integers.
 use zkp_auth::{auth_client::AuthClient, AuthenticationAnswerRequest, AuthenticationChallengeRequest, RegisterRequest};
 use chaum_pederson_rust::ZKP; // Import ZKP struct and related methods from Chaum-Pederson library.
 
@@ -10,6 +10,7 @@ pub mod zkp_auth {
 
 #[tokio::main] 
 async fn main() {
+    tracing_subscriber::fmt::init();
     let mut buf = String::new(); // Buffer for user input.
     
     // Retrieve constants like alpha, beta, p, and q used for Zero-Knowledge Proofs.
@@ -28,15 +29,15 @@ async fn main() {
         .await
         .expect("Couldn't connect to server");
 
-    println!("yoooo m the client"); // Debug message.
+    info!("Client started listening"); // Debug message.
     
     // Step 1: Register the user.
-    println!("Please provide the username:");
+    info!("Please provide the username:"); // Prompt user for username.
     stdin().read_line(&mut buf).expect("Username not provided");
     let username = buf.trim().to_string(); // Get and trim the username input.
     buf.clear(); // Clear buffer for reuse.
 
-    println!("Please provide the password:");
+    info!("Please provide the password:");
     stdin().read_line(&mut buf).expect("Password not provided");
     let password = BigUint::from_bytes_be(buf.trim().as_bytes()); // Convert password to BigUint.
     buf.clear();
@@ -57,10 +58,10 @@ async fn main() {
         .register(request)
         .await
         .expect("Could not register in server");
-    println!("Response: {:?}", response);
+    info!("Response: {:?}", response);
 
     // Step 2: Authentication challenge-response.
-    println!("Please provide the password:");
+    info!("Please provide the password:");
     stdin().read_line(&mut buf).expect("Password not provided");
     let password = BigUint::from_bytes_be(buf.trim().as_bytes()); // Convert password to BigUint.
     buf.clear();
@@ -85,7 +86,7 @@ async fn main() {
         .await
         .expect("Couldn't respond to the challenge")
         .into_inner();
-    println!("Authentication Challenge Response: {:?}", response);
+    info!("Authentication Challenge Response: {:?}", response);
 
     // Extract challenge ID and value c from server's response.
     let auth_id = response.auth_id;
@@ -105,5 +106,5 @@ async fn main() {
         .verify_authentication(request)
         .await
         .expect("Could not verify in server");
-    println!("Response: {:?}", response); // Print server's verification result.
+    info!("Response: {:?}", response); // Print server's verification result.
 }
