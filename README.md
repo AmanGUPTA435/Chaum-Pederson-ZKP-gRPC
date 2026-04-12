@@ -1,162 +1,299 @@
-# ZKP gRPC client/server for authentication
+# 🔐 Zero-Knowledge Authentication System
 
-## Local Run
+### Rust • gRPC • PostgreSQL • Chaum-Pedersen ZKP
 
-You will need to install the rust on your machine and also the `protobuf-compiler`, for Linux:
-
-```bash
-sudo apt install protobuf-compiler
-```
-
-## Docker
-
-You can run the program with Docker. First build the containers:
-
-```
-$ docker-compose build zkpserver
-```
-
-Run the container:
-
-```
-$ docker-compose run --rm zkpserver
-```
-
-In the remote terminal that appears run the server:
-
-```
-root@e84736012f9a:/zkp-server# cargo run --bin server --release
-```
-
-Open a new terminal on your machine and connect to the container:
-
-```
-$ docker container ls
-CONTAINER ID   IMAGE                  COMMAND   CREATED          STATUS          PORTS     NAMES
-e84736012f9a   zkp-course-zkpserver   "bash"    20 minutes ago   Up 20 minutes             zkp-course_zkpserver_run_b1f3fa2cd94a
-
-$ docker exec -it e84736012f9a /bin/bash
-```
-
-Run the client:
-
-```
-root@e84736012f9a:/zkp-server# cargo run --bin client --release
-```
+---
 
 ![image](https://github.com/user-attachments/assets/77cbe475-68c6-4d04-89bd-a7de1ed27c13)
 
-# Chaum-Pedersen Zero-Knowledge Proof Protocol
+## 🚀 What is this?
 
-## Overview
+A **production-style authentication service** that replaces traditional password-based login with a **Zero-Knowledge Proof (ZKP)** protocol.
 
-The Chaum-Pedersen protocol is a zero-knowledge proof scheme that allows a prover to demonstrate knowledge of a secret \( x \), such that:
-
-- \( Y_1 = g^x \)
-- \( Y_2 = h^x \)
-
-The protocol achieves this without revealing \( x \).
+👉 Users prove they know a secret **without ever sending it to the server**.
 
 ---
 
-## Parameters
+## ❗ Why this matters
 
-- **Prover (Client)**:
-  - Holds the secret \( x \).
-- **Verifier (Server)**:
-  - Validates the proof of knowledge of \( x \).
-- **Public Values**:
-  - \( g, h \): Generators in a cyclic group.
-  - \( Y_1 = g^x \), \( Y_2 = h^x \): Commitments.
-- **Random Values**:
-  - \( k \): Prover's random value.
-  - \( c \): Verifier's random challenge.
+Traditional authentication systems:
 
----
+- Store password hashes → vulnerable to leaks
+- Transmit secrets → risk interception
+- Require trust in server security
 
-## Protocol Steps
+This system:
 
-1. **Registration**:
-
-   - Prover computes \( Y_1 = g^x \) and \( Y_2 = h^x \), and sends them to the verifier.
-
-2. **Verification (Round 1)**:
-
-   - Prover generates \( k \) and computes:
-     \[
-     R_1 = g^k, \quad R_2 = h^k
-     \]
-   - Sends \( R_1, R_2 \) to the verifier.
-
-3. **Verification (Round 2)**:
-
-   - Verifier generates a random challenge \( c \) and sends it to the prover.
-
-4. **Verification (Round 3)**:
-
-   - Prover computes:
-     \[
-     s = k - c \cdot x
-     \]
-   - Sends \( s \) to the verifier.
-
-5. **Final Verification**:
-   - Verifier checks:
-     \[
-     R_1 = g^s \cdot Y_1^c, \quad R_2 = h^s \cdot Y_2^c
-     \]
-   - If both conditions are satisfied, the proof is valid.
+- ❌ Never stores passwords
+- ❌ Never transmits secrets
+- ✅ Uses cryptographic proofs instead
 
 ---
 
-## Security Properties
+## 🧠 Key Idea
 
-- **Zero-Knowledge**: The verifier learns nothing about \( x \).
-- **Soundness**: The prover cannot convince the verifier without knowing \( x \).
-- **Completeness**: If the prover knows \( x \), the proof is always accepted.
+Uses the **Chaum-Pedersen Zero-Knowledge Proof** to verify:
 
----
+```
+User knows x such that:
+Y1 = g^x
+Y2 = h^x
+```
 
-## Applications
-
-- Multi-party computation
-- Cryptographic protocols (e.g., Digital Signatures, Mix-nets)
-- Privacy-preserving systems
+Without revealing `x`.
 
 ---
 
-## Example
+## 🏗️ Architecture
 
-Suppose:
-
-- \( g = 2 \), \( h = 3 \)
-- Prover's secret \( x = 5 \)
-
-### Registration:
-
-- Compute \( Y_1 = g^x = 2^5 = 32 \), \( Y_2 = h^x = 3^5 = 243 \)
-
-### Verification:
-
-- **Round 1**:
-  - Prover generates \( k = 7 \), computes:
-    \[
-    R_1 = g^k = 2^7 = 128, \quad R_2 = h^k = 3^7 = 2187
-    \]
-  - Sends \( R_1, R_2 \) to verifier.
-- **Round 2**:
-  - Verifier sends random \( c = 4 \) to prover.
-- **Round 3**:
-  - Prover computes:
-    \[
-    s = k - c \cdot x = 7 - 4 \cdot 5 = -13
-    \]
-  - Sends \( s \) to verifier.
-- **Final Check**:
-  - Verifier checks:
-    \[
-    R_1 = g^s \cdot Y_1^c = 2^{-13} \cdot 32^4, \quad R_2 = h^s \cdot Y_2^c = 3^{-13} \cdot 243^4
-    \]
-  - If valid, the proof is accepted.
+```
+CLI Client (Prover)
+        ↓ gRPC
+Auth Server (Verifier)
+        ↓
+PostgreSQL
+```
 
 ---
+
+## ⚙️ Tech Stack
+
+- **Rust (Tokio + Tonic)** → async gRPC server/client
+- **SQLx + PostgreSQL** → compile-time checked DB queries
+- **Tracing** → structured observability
+- **DashMap / async primitives** → concurrent state handling
+
+---
+
+## 🔄 Authentication Flow
+
+### 1. Register
+
+- Client computes `(Y1, Y2)`
+- Server stores commitments
+
+---
+
+### 2. Challenge Phase
+
+- Client sends `(R1, R2)`
+- Server generates challenge `c`
+- Temporary auth session created
+
+---
+
+### 3. Verification
+
+- Client sends proof `s`
+- Server verifies:
+
+```
+g^s = R1 * Y1^c
+h^s = R2 * Y2^c
+```
+
+- On success:
+  - Session created
+  - Logs recorded
+
+---
+
+### 4. Session Management
+
+- Session stored in DB with expiry
+- Validation checks DB state
+
+---
+
+### 5. Logout
+
+- Session invalidated
+
+---
+
+## 🗄️ Database Design
+
+### `users`
+
+Stores public commitments (no secrets)
+
+```
+user_name | y1 | y2 | created_at
+```
+
+### `sessions`
+
+Tracks active sessions
+
+```
+session_id | user_name | auth_id | expires_at | is_active
+```
+
+### `auth_logs`
+
+Audit trail of all attempts
+
+```
+user_name | auth_id | session_id | success | failure_reason | created_at
+```
+
+---
+
+## 🧠 Design Decisions
+
+### 🔐 Security-first design
+
+- No passwords stored or transmitted
+- ZKP ensures zero knowledge leakage
+
+---
+
+### 🔄 Separation of concerns
+
+- Client → cryptographic operations
+- Server → verification + business logic
+- DB → persistence layer
+
+---
+
+### 🧾 Audit logging
+
+- Tracks both successful and failed attempts
+- Enables:
+  - rate limiting
+  - anomaly detection
+  - debugging
+
+---
+
+### ⚡ Rate limiting
+
+- Prevents brute-force attempts
+- Automatically resets on successful authentication
+
+---
+
+### 🧵 Concurrency-safe design
+
+- Uses async + lock-free structures where possible
+- Avoids global blocking (Mutex-heavy design avoided)
+
+---
+
+### 🧾 Transactional integrity
+
+- Session creation + logging are atomic
+- Prevents inconsistent states
+
+---
+
+## 📊 Observability
+
+- Structured logs using `tracing`
+- Request-level instrumentation
+- Latency measurement for critical operations
+
+---
+
+## 🚀 How to Run
+
+### 1. Install dependencies
+
+```bash
+sudo apt install protobuf-compiler postgresql
+```
+
+---
+
+### 2. Setup database
+
+```bash
+createdb zkp_db
+psql -d zkp_db -f schema.sql
+```
+
+---
+
+### 3. Set environment
+
+```bash
+export DATABASE_URL=postgres://postgres:password@localhost:5432/zkp_db
+```
+
+---
+
+### 4. Run server
+
+```bash
+cargo run --bin server
+```
+
+---
+
+### 5. Run client
+
+```bash
+cargo run --bin client -- register <username> <password>
+cargo run --bin client -- authenticate <username> <password>
+```
+
+---
+
+## 🐳 Docker (Optional)
+
+```bash
+docker-compose build
+docker-compose up
+```
+
+---
+
+## 🧪 Example
+
+```
+Register → OK
+Authenticate → Session ID returned
+Validate → Success
+Logout → Session invalidated
+```
+
+---
+
+## ⚠️ Limitations
+
+- Uses CLI (no UI yet)
+- In-memory rate limiting (can be moved to DB/Redis)
+- No TLS (should be added for production)
+
+---
+
+## 🔮 Future Improvements
+
+- [ ] Move rate limiting to Redis
+- [ ] Add TLS (secure transport)
+- [ ] Add refresh tokens / session rotation
+- [ ] Add metrics (Prometheus)
+- [ ] Horizontal scaling support
+
+---
+
+## 💡 What this project demonstrates
+
+- Applied cryptography (ZKP)
+- Distributed systems (client-server via gRPC)
+- Backend system design
+- Database design + consistency
+- Observability and debugging
+- Secure authentication patterns
+
+---
+
+## 👨‍💻 Author
+
+Built as a **production-style system to explore secure authentication beyond passwords**.
+
+---
+
+## ⭐ If you liked this project
+
+Star it, fork it, or break it 😄

@@ -31,8 +31,27 @@ message AuthenticationAnswerResponse {
     string session_id = 1;
 }
 
+message LogoutRequest {
+    string session_id = 1;
+}
+
+message LogoutResponse {
+    bool success = 1;
+}
+
+message ValidateSessionRequest {
+    string session_id = 1;
+}
+
+message ValidateSessionResponse {
+    bool valid = 1;
+    string user_name = 2;
+}
+
 service Auth {
     rpc Register(RegisterRequest) returns (RegisterResponse) {}
     rpc CreateAuthenticationChallenge(AuthenticationChallengeRequest) returns (AuthenticationChallengeResponse) {}
     rpc VerifyAuthentication(AuthenticationAnswerRequest) returns (AuthenticationAnswerResponse) {}
+    rpc Logout(LogoutRequest) returns (LogoutResponse) {}
+    rpc ValidateSession(ValidateSessionRequest) returns (ValidateSessionResponse) {}
 }

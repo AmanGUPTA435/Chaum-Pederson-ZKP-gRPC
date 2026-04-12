@@ -1,6 +1,7 @@
 use num_bigint::{BigUint, RandBigInt};
 use rand::{self, Rng};
-
+pub mod db;
+pub mod zkp_auth;
 /// Represents the Zero-Knowledge Proof (ZKP) constants and operations.
 pub struct ZKP {
     pub p: BigUint,      // A large prime number

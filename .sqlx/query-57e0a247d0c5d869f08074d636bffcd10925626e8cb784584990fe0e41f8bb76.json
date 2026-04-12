@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT session_id, user_name, auth_id, created_at, expires_at FROM sessions WHERE session_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "session_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "auth_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "created_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 4,
+        "name": "expires_at",
+        "type_info": "Timestamp"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "57e0a247d0c5d869f08074d636bffcd10925626e8cb784584990fe0e41f8bb76"
+}

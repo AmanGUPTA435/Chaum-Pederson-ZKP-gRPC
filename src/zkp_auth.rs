@@ -43,6 +43,32 @@ pub struct AuthenticationAnswerResponse {
     #[prost(string, tag = "1")]
     pub session_id: ::prost::alloc::string::String,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct LogoutRequest {
+    #[prost(string, tag = "1")]
+    pub session_id: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct LogoutResponse {
+    #[prost(bool, tag = "1")]
+    pub success: bool,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ValidateSessionRequest {
+    #[prost(string, tag = "1")]
+    pub session_id: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ValidateSessionResponse {
+    #[prost(bool, tag = "1")]
+    pub valid: bool,
+    #[prost(string, tag = "2")]
+    pub user_name: ::prost::alloc::string::String,
+}
 /// Generated client implementations.
 pub mod auth_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
@@ -202,6 +228,50 @@ pub mod auth_client {
                 .insert(GrpcMethod::new("zkp_auth.Auth", "VerifyAuthentication"));
             self.inner.unary(req, path, codec).await
         }
+        pub async fn logout(
+            &mut self,
+            request: impl tonic::IntoRequest<super::LogoutRequest>,
+        ) -> std::result::Result<tonic::Response<super::LogoutResponse>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/zkp_auth.Auth/Logout");
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("zkp_auth.Auth", "Logout"));
+            self.inner.unary(req, path, codec).await
+        }
+        pub async fn validate_session(
+            &mut self,
+            request: impl tonic::IntoRequest<super::ValidateSessionRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::ValidateSessionResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/zkp_auth.Auth/ValidateSession",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("zkp_auth.Auth", "ValidateSession"));
+            self.inner.unary(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -230,6 +300,17 @@ pub mod auth_server {
             request: tonic::Request<super::AuthenticationAnswerRequest>,
         ) -> std::result::Result<
             tonic::Response<super::AuthenticationAnswerResponse>,
+            tonic::Status,
+        >;
+        async fn logout(
+            &self,
+            request: tonic::Request<super::LogoutRequest>,
+        ) -> std::result::Result<tonic::Response<super::LogoutResponse>, tonic::Status>;
+        async fn validate_session(
+            &self,
+            request: tonic::Request<super::ValidateSessionRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::ValidateSessionResponse>,
             tonic::Status,
         >;
     }
@@ -433,6 +514,94 @@ pub mod auth_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = VerifyAuthenticationSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/zkp_auth.Auth/Logout" => {
+                    #[allow(non_camel_case_types)]
+                    struct LogoutSvc<T: Auth>(pub Arc<T>);
+                    impl<T: Auth> tonic::server::UnaryService<super::LogoutRequest>
+                    for LogoutSvc<T> {
+                        type Response = super::LogoutResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::LogoutRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move { (*inner).logout(request).await };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = LogoutSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/zkp_auth.Auth/ValidateSession" => {
+                    #[allow(non_camel_case_types)]
+                    struct ValidateSessionSvc<T: Auth>(pub Arc<T>);
+                    impl<
+                        T: Auth,
+                    > tonic::server::UnaryService<super::ValidateSessionRequest>
+                    for ValidateSessionSvc<T> {
+                        type Response = super::ValidateSessionResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::ValidateSessionRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                (*inner).validate_session(request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = ValidateSessionSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
