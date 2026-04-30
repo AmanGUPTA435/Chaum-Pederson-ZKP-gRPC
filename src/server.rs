@@ -482,6 +482,7 @@ impl Auth for Arc<AuthImpl> {
 }
 
 pub async fn run_server() {
+    dotenvy::dotenv().ok();
     tracing_subscriber::fmt()
         .with_env_filter("info") // can change via env
         .init();

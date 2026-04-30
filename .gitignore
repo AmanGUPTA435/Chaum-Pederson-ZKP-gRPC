@@ -1,2 +1,4 @@
 /target
 /src/zkp_auth.rs
+.env
+.env.test
