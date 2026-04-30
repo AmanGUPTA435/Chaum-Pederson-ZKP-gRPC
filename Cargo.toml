@@ -17,15 +17,19 @@ dashmap = "6.1.0"
 clap = { version = "4.5", features = ["derive"] }
 sqlx = { version = "0.8", features = ["macros", "runtime-tokio-rustls", "postgres", "chrono"] }
 chrono = "0.4.44"
+dotenvy = "0.15"
+uuid = { version = "1.23.1", features = ["v4"] }
+tokio-stream = { version = "0.1", features = ["net"] }
+num-traits = "0.2.19"
 
 [build-dependencies]
 tonic-build = "0.9"
 
 [[bin]]
 name = "server"
-path = "./src/server.rs"
+path = "./src/bin/server.rs"
 
 [[bin]]
 name = "client"
-path = "./src/client.rs"
+path = "./src/bin/client.rs"
 
