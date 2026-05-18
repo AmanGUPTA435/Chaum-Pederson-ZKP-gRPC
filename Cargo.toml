@@ -7,9 +7,9 @@ edition = "2021"
 rand = "0.8"
 num-bigint = { version = "0.4", features = ["rand"] }
 hex = "0.4.3"
-tonic = "0.9"
+tonic = { version = "0.9", features = ["tls"] }
 prost = "0.11"
-tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] } # async rust runtime
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread", "fs"] }
 thiserror = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
@@ -21,6 +21,8 @@ dotenvy = "0.15"
 uuid = { version = "1.23.1", features = ["v4"] }
 tokio-stream = { version = "0.1", features = ["net"] }
 num-traits = "0.2.19"
+base64 = "0.22"
+sha2 = "0.10"
 
 [build-dependencies]
 tonic-build = "0.9"

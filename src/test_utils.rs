@@ -1,17 +1,15 @@
+use crate::server::AuthImpl;
+use crate::zkp_auth::auth_server::AuthServer;
+use crate::ZKP;
 use dashmap::DashMap;
+use num_bigint::BigUint;
 use sqlx::PgPool;
 use std::sync::Arc;
 use tokio_stream::wrappers::TcpListenerStream;
 use tonic::transport::Server;
-use crate::zkp_auth::auth_server::AuthServer;
-use crate::server::{AuthImpl};
-use crate::ZKP;
-use num_bigint::BigUint;
 
 pub async fn spawn_test_server() -> String {
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-        .await
-        .unwrap();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
 
     let addr = listener.local_addr().unwrap();
 

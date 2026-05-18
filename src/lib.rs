@@ -1,8 +1,8 @@
 use num_bigint::{BigUint, RandBigInt};
 use rand::{self, Rng};
+pub mod client;
 pub mod db;
 pub mod server;
-pub mod client;
 pub mod test_utils;
 pub mod zkp_auth {
     include!("./zkp_auth.rs");

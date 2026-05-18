@@ -2,3 +2,4 @@
 /src/zkp_auth.rs
 .env
 .env.test
+certs/*.key

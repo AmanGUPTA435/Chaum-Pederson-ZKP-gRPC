@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT user_name, y1, y2, created_at FROM users",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "y1",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 2,
+        "name": "y2",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 3,
+        "name": "created_at",
+        "type_info": "Timestamp"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "d0c227568a9ab8439b98f868840355fd4812697f9a7693f744e21f266de931f1"
+}

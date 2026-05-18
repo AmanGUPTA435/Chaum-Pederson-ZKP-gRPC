@@ -14,14 +14,21 @@ use std::{
 use num_bigint::BigUint;
 use sqlx::PgPool;
 // BigUint helps us to work with very large number, which is essential for zero knowledge applications
-use thiserror::Error;
-use tonic::{transport::Server, Request, Response, Result, Status}; // Import Tonic for building gRPC services.
-use tracing::{event, info, instrument, Level};
 use crate::zkp_auth::{
-    self, auth_server::{Auth, AuthServer},
+    self,
+    auth_server::{Auth, AuthServer},
     AuthenticationAnswerRequest, AuthenticationAnswerResponse, AuthenticationChallengeRequest,
     AuthenticationChallengeResponse, RegisterRequest, RegisterResponse,
 };
+use thiserror::Error;
+use tonic::{
+    transport::{Identity, Server, ServerTlsConfig},
+    Request, Response, Result, Status,
+}; // Import Tonic for building gRPC services.
+use tracing::{event, info, instrument, Level};
+use rand::RngCore;
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use sha2::{Digest, Sha256};
 
 #[derive(Error, Debug)]
 pub enum AuthError {
@@ -321,7 +328,7 @@ impl Auth for Arc<AuthImpl> {
             .map_err(|e| AuthError::Internal(format!("DB Transaction failed: {}", e)))?;
 
         if verify {
-            let session_id = ZKP::generate_random_string(12);
+            let session_id = generate_session_id();
             let auth_log = AuthLog {
                 user_name: user_name.clone(),
                 auth_id: auth_id.clone(),
@@ -329,8 +336,9 @@ impl Auth for Arc<AuthImpl> {
                 created_at: chrono::Utc::now(),
                 failure_reason: None,
             };
+            let session_hash = hash_session_id(&session_id);
             let session = Session {
-                session_id: session_id.clone(),
+                session_id_hash: session_hash,
                 user_name: user_name.clone(),
                 auth_id: auth_id.clone(),
                 created_at: chrono::Utc::now(),
@@ -365,7 +373,6 @@ impl Auth for Arc<AuthImpl> {
                 user = %user_name,
                 success = verify,
                 event = "verify",
-                session_id = %session_id,
                 duration_ms = start.elapsed().as_millis(),
                 "completed"
             );
@@ -411,7 +418,8 @@ impl Auth for Arc<AuthImpl> {
     ) -> std::result::Result<tonic::Response<zkp_auth::LogoutResponse>, tonic::Status> {
         let request = request.into_inner();
         let session_id = request.session_id;
-        info!(session_id = %session_id, event = "logout", "start"); // Log the session being logged out.
+        let session_id_hash = hash_session_id(&session_id);
+        info!(event = "logout", "start"); // Do not log raw bearer tokens.
 
         let mut tx = self
             .db
@@ -419,16 +427,16 @@ impl Auth for Arc<AuthImpl> {
             .await
             .map_err(|e| AuthError::Internal(format!("DB Transaction failed: {}", e)))?;
 
-        match db::delete_session_by_id(&mut tx, &session_id).await {
+        match db::delete_session_by_id(&mut tx, &session_id_hash).await {
             Ok(_) => {
                 tx.commit()
                     .await
                     .map_err(|e| AuthError::Internal(format!("Commit failed: {}", e)))?;
-                info!(session_id = %session_id, event = "logout", "completed"); // Log successful logout.
+                info!(event = "logout", "completed"); // Log successful logout.
                 Ok(Response::new(zkp_auth::LogoutResponse { success: true }))
             }
             Err(e) => {
-                info!(session_id = %session_id, error = %e, event = "logout", "failed"); // Log failed logout attempt.
+                info!(error = %e, event = "logout", "failed"); // Log failed logout attempt.
                 Err(AuthError::Internal(format!("DB error: {}", e)).into())
             }
         }
@@ -443,23 +451,23 @@ impl Auth for Arc<AuthImpl> {
     {
         let request = request.into_inner();
         let session_id = request.session_id;
-        info!(session_id = %session_id, event = "validate_session", "start"); // Log the session being validated.
-
+        info!(event = "validate_session", "start"); // Do not log raw bearer tokens.
+        let session_id_hash = hash_session_id(&session_id);
         let mut tx = self
             .db
             .begin()
             .await
             .map_err(|e| AuthError::Internal(format!("DB Transaction failed: {}", e)))?;
-        match db::get_session_by_id(&mut tx, &session_id).await {
+        match db::get_session_by_id(&mut tx, &session_id_hash).await {
             Ok(Some(session)) => {
                 if session.created_at + chrono::Duration::hours(1) < Utc::now() {
-                    info!(session_id = %session_id, event = "validate_session", "failed - expired"); // Log expired session validation attempt.
+                    info!(event = "validate_session", "failed - expired"); // Log expired session validation attempt.
                     return Ok(Response::new(zkp_auth::ValidateSessionResponse {
                         valid: false,
                         user_name: session.user_name,
                     }));
                 } else {
-                    info!(session_id = %session_id, event = "validate_session", "completed"); // Log successful session validation.
+                    info!(event = "validate_session", "completed"); // Log successful session validation.
                     return Ok(Response::new(zkp_auth::ValidateSessionResponse {
                         valid: true,
                         user_name: session.user_name,
@@ -467,18 +475,28 @@ impl Auth for Arc<AuthImpl> {
                 }
             }
             Ok(None) => {
-                info!(session_id = %session_id, event = "validate_session", "failed - not found"); // Log session not found validation attempt.
+                info!(event = "validate_session", "failed - not found"); // Log session not found validation attempt.
                 return Ok(Response::new(zkp_auth::ValidateSessionResponse {
                     valid: false,
                     user_name: String::new(),
                 }));
             }
             Err(e) => {
-                info!(session_id = %session_id, error = %e, event = "validate_session", "failed - db error"); // Log database error during session validation.
+                info!(error = %e, event = "validate_session", "failed - db error"); // Log database error during session validation.
                 return Err(AuthError::Internal(format!("DB error: {}", e)).into());
             }
         }
     }
+}
+
+pub fn generate_session_id() -> String {
+    let mut bytes = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut bytes);
+    URL_SAFE_NO_PAD.encode(bytes)
+}
+
+pub fn hash_session_id(session_id: &str) -> Vec<u8> {
+    Sha256::digest(session_id.as_bytes()).to_vec()
 }
 
 pub async fn run_server() {
@@ -514,8 +532,20 @@ pub async fn run_server() {
             };
         }
     });
+    let cert = tokio::fs::read("certs/server.pem")
+        .await
+        .expect("failed to read TLS certificate");
+
+    let key = tokio::fs::read("certs/server.key")
+        .await
+        .expect("failed to read TLS private key");
+
+    let identity = Identity::from_pem(cert, key);
+
     Server::builder()
-        .add_service(AuthServer::new((auth_impl).clone()))
+        .tls_config(ServerTlsConfig::new().identity(identity))
+        .expect("failed to configure TLS")
+        .add_service(AuthServer::new(auth_impl))
         .serve(addr.parse().expect("Couldn't convert address"))
         .await
         .unwrap();
@@ -851,7 +881,7 @@ mod tests {
         let res = client
             .create_authentication_challenge(AuthenticationChallengeRequest {
                 name: username.clone(),
-                r1: vec![1], 
+                r1: vec![1],
                 r2: vec![1],
             })
             .await;

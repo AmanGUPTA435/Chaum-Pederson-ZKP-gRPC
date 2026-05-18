@@ -9,7 +9,7 @@ CREATE TABLE auth_logs (
     id SERIAL PRIMARY KEY,
     user_name TEXT NOT NULL,
     auth_id TEXT,
-    session_id TEXT,
+    session_id_hash BYTEA,
     success BOOLEAN NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     failure_reason TEXT,
@@ -18,7 +18,7 @@ CREATE TABLE auth_logs (
 );
 
 CREATE TABLE sessions (
-    session_id TEXT PRIMARY KEY,
+    session_id_hash BYTEA PRIMARY KEY,
     user_name TEXT NOT NULL,
     auth_id TEXT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

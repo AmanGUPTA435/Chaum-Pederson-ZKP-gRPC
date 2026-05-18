@@ -1,14 +1,14 @@
 use clap::{Parser, Subcommand};
 use num_bigint::BigUint;
 use std::time::Instant;
-use tonic::transport::Channel;
+use tonic::transport::{Certificate, Channel, ClientTlsConfig};
 use tracing::{info, instrument};
 // Import BigUint for handling large integers.
-use crate::ZKP;
 use crate::zkp_auth::{
     self, auth_client::AuthClient, AuthenticationAnswerRequest, AuthenticationChallengeRequest,
     RegisterRequest,
 };
+use crate::ZKP;
 
 #[derive(Parser)]
 #[command(name = "ZKP Client", about = "A client for ZKP authentication server")]
@@ -170,11 +170,32 @@ pub async fn run_client() {
     // Initialize the ZKP struct with constants.
     let zkp = ZKP { p, q, alpha, beta };
 
-    // Connect to the authentication server via gRPC.
-    let mut client = match AuthClient::connect("http://127.0.0.1:50051").await {
-        Ok(client) => client,
+    let ca_cert = match tokio::fs::read("certs/server.pem").await {
+        Ok(cert) => cert,
         Err(e) => {
-            info!(error = %e, event = "connect", "failed to connect to server");
+            info!(error = %e, event = "connect", "failed to read TLS certificate");
+            return;
+        }
+    };
+    let ca_cert = Certificate::from_pem(ca_cert);
+
+    let channel = match Channel::from_static("https://127.0.0.1:50051").tls_config(
+        ClientTlsConfig::new()
+            .ca_certificate(ca_cert)
+            .domain_name("localhost"),
+    ) {
+        Ok(endpoint) => endpoint.connect().await,
+        Err(e) => {
+            info!(error = %e, event = "connect", "failed to configure TLS");
+            return;
+        }
+    };
+
+    // Connect to the authentication server via gRPC.
+    let mut client = match channel {
+        Ok(channel) => AuthClient::new(channel),
+        Err(e) => {
+            info!(error = ?e, event = "connect", "failed to connect to server");
             return;
         }
     };
@@ -199,11 +220,11 @@ pub async fn run_client() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use uuid::Uuid;
-    use num_bigint::BigUint;
-    use clap::Parser;
-    use num_traits::Zero;
     use crate::test_utils::{setup_zkp, spawn_test_server};
+    use clap::Parser;
+    use num_bigint::BigUint;
+    use num_traits::Zero;
+    use uuid::Uuid;
 
     #[test]
     fn test_register_request_construction() {

@@ -22,7 +22,7 @@ pub struct AuthLog {
 #[derive(Clone)]
 pub struct Session {
     pub user_name: String,
-    pub session_id: String,
+    pub session_id_hash: Vec<u8>,
     pub auth_id: String,
     pub created_at: DateTime<Utc>,
 }
@@ -70,8 +70,8 @@ pub async fn insert_session(
     session: Session,
 ) -> Result<(), sqlx::Error> {
     sqlx::query!(
-        "INSERT INTO sessions (session_id, user_name, auth_id, created_at, expires_at) VALUES ($1, $2, $3, $4, $5)",
-        session.session_id,
+        "INSERT INTO sessions (session_id_hash, user_name, auth_id, created_at, expires_at) VALUES ($1, $2, $3, $4, $5)",
+        session.session_id_hash,
         session.user_name,
         session.auth_id,
         session.created_at.naive_utc(),
@@ -100,9 +100,12 @@ pub async fn delete_all_users(tx: &mut Transaction<'_, Postgres>) -> Result<(), 
 
 pub async fn delete_session_by_id(
     tx: &mut Transaction<'_, Postgres>,
-    session_id: &str,
+    session_id_hash: &[u8],
 ) -> Result<(), sqlx::Error> {
-    sqlx::query!("DELETE FROM sessions WHERE session_id = $1", session_id)
+    sqlx::query!(
+        "DELETE FROM sessions WHERE session_id_hash = $1",
+        session_id_hash
+    )
         .execute(&mut **tx)
         .await?;
     Ok(())
@@ -175,18 +178,18 @@ pub async fn count_users(tx: &mut Transaction<'_, Postgres>) -> Result<i64, sqlx
 
 pub async fn get_session_by_id(
     tx: &mut Transaction<'_, Postgres>,
-    session_id: &str,
+    session_id_hash: &[u8],
 ) -> Result<Option<Session>, sqlx::Error> {
     let row = sqlx::query!(
-        "SELECT session_id, user_name, auth_id, created_at, expires_at FROM sessions WHERE session_id = $1",
-        session_id
+        "SELECT session_id_hash, user_name, auth_id, created_at, expires_at FROM sessions WHERE session_id_hash = $1",
+        session_id_hash
     )
     .fetch_optional(&mut **tx)
     .await?;
 
     if let Some(row) = row {
         Ok(Some(Session {
-            session_id: row.session_id,
+            session_id_hash: row.session_id_hash,
             user_name: row.user_name,
             auth_id: row.auth_id,
             created_at: DateTime::<Utc>::from_utc(row.created_at, Utc),
@@ -228,19 +231,18 @@ pub async fn get_login_attempts_by_user(
 mod tests {
     use super::*;
     use dotenvy::from_filename;
+    use sqlx::postgres::PgPoolOptions;
     use sqlx::PgPool;
     use std::env;
-    use sqlx::postgres::PgPoolOptions;
     use std::time::Duration;
 
     async fn setup_db() -> PgPool {
         from_filename(".env.test").ok();
 
-        let db_url = env::var("DATABASE_URL")
-            .expect("DATABASE_URL must be set");
+        let db_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
         PgPoolOptions::new()
-            .max_connections(2) 
+            .max_connections(2)
             .acquire_timeout(Duration::from_secs(5))
             .connect(&db_url)
             .await
@@ -258,6 +260,7 @@ mod tests {
             y2: BigUint::from(20u32),
             created_at: Utc::now(),
         };
+        let initial_count = count_users(&mut tx).await.expect("failed to count users");
 
         insert_user(&mut tx, user_1)
             .await
@@ -281,13 +284,12 @@ mod tests {
             .expect("failed to insert user");
 
         let count = count_users(&mut tx).await.expect("failed to count users");
-        assert_eq!(count, 2);
+        assert_eq!(count, initial_count + 2);
 
         let all_users = get_all_users(&mut tx)
             .await
             .expect("Failed to get all users");
 
-        assert!(all_users.len() == 2);
         let names: Vec<_> = all_users.iter().map(|u| u.user_name.as_str()).collect();
 
         assert!(names.contains(&username_1.as_str()));
@@ -305,7 +307,7 @@ mod tests {
         let count = count_users(&mut tx)
             .await
             .expect("failed to count users after deletion");
-        assert_eq!(count, 1);
+        assert_eq!(count, initial_count + 1);
 
         tx.rollback().await.expect("failed to rollback transaction");
     }
@@ -325,10 +327,10 @@ mod tests {
             .await
             .expect("failed to insert user");
 
-        let session_id = format!("session_{}", uuid::Uuid::new_v4());
+        let session_id = format!("session_{}", uuid::Uuid::new_v4()).into_bytes();
 
         let session = Session {
-            session_id: session_id.clone(),
+            session_id_hash: session_id.clone(),
             user_name: user_name.clone(),
             auth_id: "test_auth".to_string(),
             created_at: Utc::now(),
@@ -352,7 +354,7 @@ mod tests {
             .await
             .expect("failed to get session");
         let fetched = fetched.expect("session not found");
-        assert_eq!(fetched.session_id, session_id);
+        assert_eq!(fetched.session_id_hash, session_id);
 
         let logs = get_login_attempts_by_user(&mut tx, &user_name)
             .await
@@ -427,7 +429,7 @@ mod tests {
         let pool = setup_db().await;
         let mut tx = pool.begin().await.expect("failed to begin transaction");
         let session = Session {
-            session_id: format!("orphan_session_{}", uuid::Uuid::new_v4()),
+            session_id_hash: format!("orphan_session_{}", uuid::Uuid::new_v4()).into_bytes(),
             user_name: format!("non_existent_user_{}", uuid::Uuid::new_v4()),
             auth_id: "test_auth".to_string(),
             created_at: Utc::now(),
@@ -452,9 +454,9 @@ mod tests {
             .await
             .expect("failed to insert user");
 
-        let session_id = format!("cascade_session_{}", uuid::Uuid::new_v4());
+        let session_id = format!("cascade_session_{}", uuid::Uuid::new_v4()).into_bytes();
         let session = Session {
-            session_id: session_id.clone(),
+            session_id_hash: session_id.clone(),
             user_name: username.clone(),
             auth_id: "test_auth".to_string(),
             created_at: Utc::now(),
@@ -489,7 +491,7 @@ mod tests {
             .await
             .expect("failed to insert user");
         let expired_session = Session {
-            session_id: format!("expired_session_{}", uuid::Uuid::new_v4()),
+            session_id_hash: format!("expired_session_{}", uuid::Uuid::new_v4()).into_bytes(),
             user_name: username.clone(),
             auth_id: "test_auth".to_string(),
             created_at: Utc::now() - chrono::Duration::hours(2), // Created 2 hours ago
@@ -498,7 +500,7 @@ mod tests {
             .await
             .expect("failed to insert expired session");
         let valid_session = Session {
-            session_id: format!("valid_session_{}", uuid::Uuid::new_v4()),
+            session_id_hash: format!("valid_session_{}", uuid::Uuid::new_v4()).into_bytes(),
             user_name: username.clone(),
             auth_id: "test_auth".to_string(),
             created_at: Utc::now(), // Created now
@@ -509,11 +511,11 @@ mod tests {
         delete_expired_sessions(&mut tx)
             .await
             .expect("failed to delete expired sessions");
-        let fetched_expired = get_session_by_id(&mut tx, &expired_session.session_id)
+        let fetched_expired = get_session_by_id(&mut tx, &expired_session.session_id_hash)
             .await
             .expect("failed to get expired session after deletion");
         assert!(fetched_expired.is_none());
-        let fetched_valid = get_session_by_id(&mut tx, &valid_session.session_id)
+        let fetched_valid = get_session_by_id(&mut tx, &valid_session.session_id_hash)
             .await
             .expect("failed to get valid session after deletion");
         assert!(fetched_valid.is_some());
